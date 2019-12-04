@@ -13,22 +13,35 @@ function logger(req, res, next) {
   next(); // allows the next middleware or route handler to be ran
 }
 
+// Checks if the password is equal to melon, if so, then allows the next function to run, else, immediately returns an error
 function gateKeeper(req, res, next) {
-  console.log('Gatekeeper check!');
-  next();
+  const password = req.headers.password;
+
+  if (password && password.toLowerCase() === 'melon') {
+    next();
+  } else {
+    res.status(401).json({errorMessage: 'Sorry, but the password is incorrect.'});
+  }
 }
 
-// Write a gatekeeper middleware that reads a password from the headers and if the password is 'melon', let it continue, else, send back a 401 status code and a message.
-// Use it for the /area51 endpoint
+// if making a dynamic function, we need to return a function. For example, we want to run a condition based upon a users specific role that is being passed
+const checkRole = (role) => {
+  return function (req, res, next) {
+    if (role && role === req.headers.role) {
+      next();
+    } else {
+      res.status(403).json({message: "Can't touch this!"})
+    }
+  }
+};
 
 // server.use(helmet()); // this will apply it globally
 server.use(express.json());
 server.use(logger);
 
-
 // Endpoints
 // This router is local middleware because hubsRouter ONLY applies to this specific route
-server.use('/api/hubs', helmet(), hubsRouter);
+server.use('/api/hubs', helmet(), checkRole('admin'), hubsRouter);
 
 server.get('/', (req, res) => {
   const nameInsert = (req.name) ? ` ${req.name}` : '';
@@ -43,14 +56,9 @@ server.get("/echo", (req, res) => {
   res.send(req.headers);
 });
 
-server.use(gateKeeper);
 // this middleware is applied locally to the /area51
-server.get("/area51", helmet(), (req, res) => {
-  if (req.headers.password === 'melon') {
-    res.send(req.headers);
-  } else {
-    res.status(401).json({errorMessage: 'Sorry, but the password is incorrect!'})
-  }
+server.get("/area51", helmet(), gateKeeper, checkRole('agent'), (req, res) => {
+  res.send(req.headers);
 });
 
 
